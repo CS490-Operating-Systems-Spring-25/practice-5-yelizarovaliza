@@ -1,0 +1,126 @@
+
+var fileName
+var fileDescriptor
+var lineNumber
+var lineContent
+var modifiedLine
+var firstChar
+var temp
+var sys_return
+
+label startKernel
+    write "Enter the file name to modify:" to DISPLAY_BUFFER
+    write OP_DISPLAY_LN to REG_OP
+    cpu_exec
+
+    write OP_READ_INPUT to REG_OP
+    write KEYBOARD_READ_LINE to KEYBOARD_BUFFER
+    cpu_exec
+    copy KEYBOARD_BUFFER to var:fileName
+
+    copy var:fileName to REG_A
+    copy PROGRAM_COUNTER to var:sys_return
+    jump label:sys_fs_open
+    copy REG_RES to var:fileDescriptor
+    jump_err label:fileOpenError
+
+    write 0 to var:lineNumber
+
+label readLoop
+    copy var:fileDescriptor to REG_A
+    copy var:lineNumber to REG_B
+    copy PROGRAM_COUNTER to var:sys_return
+    jump label:sys_fs_read
+    copy REG_RES to var:lineContent
+    jump_err label:fileReadError
+
+    copy var:lineContent to REG_A
+    write "" to REG_B
+    write OP_CMP_EQ to REG_OP
+    cpu_exec
+    jump_if label:fileModificationComplete
+
+    copy var:lineContent to REG_A
+    write 1 to REG_B
+    write "" to REG_C
+    write OP_GET_COLUMN to REG_OP
+    cpu_exec
+    copy REG_RES to var:firstChar
+
+    copy var:firstChar to REG_A
+    write OP_IS_NUM to REG_OP
+    cpu_exec
+    jump_if_not label:skipModify
+
+    copy var:firstChar to REG_A
+    write 1 to REG_B
+    write OP_ADD to REG_OP
+    cpu_exec
+    copy REG_RES to var:firstChar
+
+    copy var:lineContent to REG_A
+    copy var:firstChar to REG_B
+    write OP_STARTS_WITH to REG_OP
+    cpu_exec
+    copy REG_RES to var:modifiedLine
+
+    copy var:fileDescriptor to REG_A
+    copy var:lineNumber to REG_B
+    copy var:modifiedLine to REG_C
+    copy PROGRAM_COUNTER to var:sys_return
+    jump label:sys_fs_write
+    jump_err label:fileWriteError
+
+label skipModify
+    copy var:lineNumber to REG_A
+    write OP_INCR to REG_OP
+    cpu_exec
+    copy REG_RES to var:lineNumber
+
+    jump label:readLoop
+
+label fileModificationComplete
+    write "File modification completed successfully." to DISPLAY_BUFFER
+    write OP_DISPLAY_LN to REG_OP
+    cpu_exec
+
+    copy var:fileDescriptor to REG_A
+    copy PROGRAM_COUNTER to var:sys_return
+    jump label:sys_fs_close
+    jump_err label:fileCloseError
+
+    jump label:exitProgram
+
+label fileOpenError
+    write "Error: Failed to open the file." to DISPLAY_BUFFER
+    write COLOR_RED to DISPLAY_COLOR
+    write OP_DISPLAY_LN to REG_OP
+    cpu_exec
+    jump label:exitProgram
+
+label fileReadError
+    write "Error: Failed to read from the file." to DISPLAY_BUFFER
+    write COLOR_RED to DISPLAY_COLOR
+    write OP_DISPLAY_LN to REG_OP
+    cpu_exec
+    jump label:exitProgram
+
+label fileWriteError
+    write "Error: Failed to write to the file." to DISPLAY_BUFFER
+    write COLOR_RED to DISPLAY_COLOR
+    write OP_DISPLAY_LN to REG_OP
+    cpu_exec
+    jump label:exitProgram
+
+label fileCloseError
+    write "Error: Failed to close the file." to DISPLAY_BUFFER
+    write COLOR_RED to DISPLAY_COLOR
+    write OP_DISPLAY_LN to REG_OP
+    cpu_exec
+    jump label:exitProgram
+
+label exitProgram
+    write "Exiting..." to DISPLAY_BUFFER
+    write OP_DISPLAY_LN to REG_OP
+    write OP_HALT to REG_OP
+    cpu_exec
