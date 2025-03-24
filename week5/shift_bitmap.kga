@@ -1,0 +1,97 @@
+var bitmap
+var shiftedBitmap
+var temp
+var shiftDirection
+var bitmapLength
+var newChar
+
+label startKernel
+    write "Enter a bitmap (e.g., 101010):" to DISPLAY_BUFFER
+    write OP_DISPLAY_LN to REG_OP
+    cpu_exec
+
+    write OP_READ_INPUT to REG_OP
+    write KEYBOARD_READ_LINE to KEYBOARD_BUFFER
+    cpu_exec
+    copy KEYBOARD_BUFFER to var:bitmap
+
+    write "Press 'a' to left shift, 'd' to right shift, 'q' to quit." to DISPLAY_BUFFER
+    write OP_DISPLAY_LN to REG_OP
+    cpu_exec
+
+label inputLoop
+    write OP_READ_INPUT to REG_OP
+    write KEYBOARD_READ_CHAR to KEYBOARD_BUFFER
+    cpu_exec
+    copy KEYBOARD_BUFFER to var:shiftDirection
+
+    copy var:shiftDirection to REG_A
+    write "a" to REG_B
+    write OP_CMP_EQ to REG_OP
+    cpu_exec
+    jump_if label:leftShift
+
+    copy var:shiftDirection to REG_A
+    write "d" to REG_B
+    write OP_CMP_EQ to REG_OP
+    cpu_exec
+    jump_if label:rightShift
+
+    copy var:shiftDirection to REG_A
+    write "q" to REG_B
+    write OP_CMP_EQ to REG_OP
+    cpu_exec
+    jump_if label:exitProgram
+
+    jump label:inputLoop
+
+label leftShift
+    copy var:bitmap to REG_A
+    write OP_GET_LENGTH to REG_OP
+    cpu_exec
+    copy REG_RES to var:bitmapLength
+
+    copy 1 to REG_A
+    copy var:bitmapLength to REG_B
+    write OP_CMP_LT to REG_OP
+    cpu_exec
+    jump_if_not label:inputLoop
+
+    copy var:bitmap to REG_A
+    write 1 to REG_B
+    write OP_STARTS_WITH to REG_OP
+    cpu_exec
+    copy REG_RES to var:shiftedBitmap
+
+    copy var:shiftedBitmap to DISPLAY_BUFFER
+    write OP_DISPLAY_LN to REG_OP
+    cpu_exec
+
+    copy var:shiftedBitmap to var:bitmap
+    jump label:inputLoop
+
+label rightShift
+    copy var:bitmap to REG_A
+    write OP_GET_LENGTH to REG_OP
+    cpu_exec
+    copy REG_RES to var:bitmapLength
+
+    write "1" to var:newChar
+    copy var:newChar to REG_A
+    copy var:bitmap to REG_B
+    write OP_CONCAT_WITH to REG_OP
+    cpu_exec
+    copy REG_RES to var:shiftedBitmap
+
+    copy var:shiftedBitmap to DISPLAY_BUFFER
+    write OP_DISPLAY_LN to REG_OP
+    cpu_exec
+
+    copy var:shiftedBitmap to var:bitmap
+    jump label:inputLoop
+
+label exitProgram
+    write "Exiting..." to DISPLAY_BUFFER
+    write OP_DISPLAY_LN to REG_OP
+    write OP_HALT to REG_OP
+    cpu_exec

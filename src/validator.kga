@@ -1,0 +1,204 @@
+DEBUG_OFF
+
+label kernel_entry_point
+
+// Let's init pointer to the stack
+//      var:sys_stack_ptr = FREE_MEMORY_END + 1
+// Therefore on any push to stack we will decrement it
+// If sys_stack_pop will be called incorrectly then we will get crashed
+copy FREE_MEMORY_END to REG_A
+write OP_INCR to REG_OP
+cpu_exec
+copy REG_RES to var:sys_stack_ptr
+
+// init file system
+copy PROGRAM_COUNTER to var:sys_return
+jump label:sys_fs_init
+
+var disk_name
+var partition_name
+var header_block
+var header_line
+var first_usable
+var last_usable
+var current_block
+var block_content
+var temp_str
+var temp_num
+
+label startValidator
+    // disk name
+    write "Enter disk name: " to DISPLAY_BUFFER
+    write OP_DISPLAY_LN to REG_OP
+    cpu_exec
+
+    write OP_READ_INPUT to REG_OP
+    write KEYBOARD_READ_LINE to KEYBOARD_BUFFER
+    cpu_exec
+    copy KEYBOARD_BUFFER to var:disk_name
+
+    //partition name
+    write "Enter partition name: " to DISPLAY_BUFFER
+    write OP_DISPLAY_LN to REG_OP
+    cpu_exec
+
+    write OP_READ_INPUT to REG_OP
+    write KEYBOARD_READ_LINE to KEYBOARD_BUFFER
+    cpu_exec
+    copy KEYBOARD_BUFFER to var:partition_name
+
+    // check partition
+    copy var:disk_name to REG_A
+    copy var:partition_name to REG_B
+    write 0 to REG_C
+    write OP_READ_BLOCK to REG_OP
+    cpu_exec
+    jump_err label:partition_not_exists
+    copy REG_RES to var:header_block
+
+    //first line
+    copy var:header_block to REG_A
+    write 0 to REG_B
+    write "\n" to REG_C
+    write OP_GET_COLUMN to REG_OP
+    cpu_exec
+    copy REG_RES to var:header_line
+
+    // header format
+    copy var:header_line to REG_A
+    write "FS_HEADER" to REG_B
+    write OP_STARTS_WITH to REG_OP
+    cpu_exec
+    jump_if_not label:invalid_header_format
+
+    //сheck contains
+    copy var:header_line to REG_A
+    write " kagu_fs " to REG_B
+    write OP_CONTAINS to REG_OP
+    cpu_exec
+    jump_if_not label:invalid_header_format
+
+    // сheck "FIRST_USABLE_BLOCK"
+    copy var:header_line to REG_A
+    write " FIRST_USABLE_BLOCK " to REG_B
+    write OP_CONTAINS to REG_OP
+    cpu_exec
+    jump_if_not label:invalid_header_format
+
+    //сheck "LAST_USABLE_BLOCK"
+    copy var:header_line to REG_A
+    write " LAST_USABLE_BLOCK " to REG_B
+    write OP_CONTAINS to REG_OP
+    cpu_exec
+    jump_if_not label:invalid_header_format
+
+    // first usable block number
+    copy var:header_line to REG_A
+    write "FIRST_USABLE_BLOCK " to REG_B
+    write OP_STARTS_WITH to REG_OP
+    cpu_exec
+    copy REG_RES to var:temp_str
+
+    copy var:temp_str to REG_A
+    write 0 to REG_B
+    write " " to REG_C
+    write OP_GET_COLUMN to REG_OP
+    cpu_exec
+    copy REG_RES to var:temp_str
+    write OP_IS_NUM to REG_OP
+    cpu_exec
+    jump_if_not label:invalid_block_numbers
+    copy var:temp_str to REG_A
+    write OP_GET_LENGTH to REG_OP
+    cpu_exec
+    copy REG_RES to var:first_usable
+
+    //last usable block number
+    copy var:header_line to REG_A
+    write "LAST_USABLE_BLOCK " to REG_B
+    write OP_STARTS_WITH to REG_OP
+    cpu_exec
+    copy REG_RES to var:temp_str
+
+    copy var:temp_str to REG_A
+    write 0 to REG_B
+    write " " to REG_C
+    write OP_GET_COLUMN to REG_OP
+    cpu_exec
+    copy REG_RES to var:temp_str
+    write OP_IS_NUM to REG_OP
+    cpu_exec
+    jump_if_not label:invalid_block_numbers
+    copy var:temp_str to REG_A
+    write OP_GET_LENGTH to REG_OP
+    cpu_exec
+    copy REG_RES to var:last_usable
+
+    // block numbers
+    copy var:first_usable to REG_A
+    copy var:last_usable to REG_B
+    write OP_CMP_LT to REG_OP
+    cpu_exec
+    jump_if_not label:invalid_block_numbers
+
+    // Check FS_HEADER_END
+    write 1 to var:current_block
+
+label check_header_end_loop
+    copy var:current_block to REG_A
+    copy var:first_usable to REG_B
+    write OP_CMP_LT to REG_OP
+    cpu_exec
+    jump_if_not label:header_end_missing
+
+    //кead current block
+    copy var:disk_name to REG_A
+    copy var:partition_name to REG_B
+    copy var:current_block to REG_C
+    write OP_READ_BLOCK to REG_OP
+    cpu_exec
+    copy REG_RES to var:block_content
+
+    //сheck for FS_HEADER_END
+    copy var:block_content to REG_A
+    write "FS_HEADER_END" to REG_B
+    write OP_CONTAINS to REG_OP
+    cpu_exec
+    jump_if label:header_end_found
+
+    //inc block counter
+    copy var:current_block to REG_A
+    write OP_INCR to REG_OP
+    cpu_exec
+    copy REG_RES to var:current_block
+    jump label:check_header_end_loop
+
+label header_end_found
+    write "Partition validation successful" to DISPLAY_BUFFER
+    write OP_DISPLAY_LN to REG_OP
+    write OP_HALT to REG_OP
+    cpu_exec
+
+label partition_not_exists
+    write "Error: Partition does not exist" to DISPLAY_BUFFER
+    write OP_DISPLAY_LN to REG_OP
+    write OP_HALT to REG_OP
+    cpu_exec
+
+label invalid_header_format
+    write "Error: Invalid partition header format" to DISPLAY_BUFFER
+    write OP_DISPLAY_LN to REG_OP
+    write OP_HALT to REG_OP
+    cpu_exec
+
+label invalid_block_numbers
+    write "Error: Invalid block numbers in header" to DISPLAY_BUFFER
+    write OP_DISPLAY_LN to REG_OP
+    write OP_HALT to REG_OP
+    cpu_exec
+
+label header_end_missing
+    write "Error: FS_HEADER_END not found before first usable block" to DISPLAY_BUFFER
+    write OP_DISPLAY_LN to REG_OP
+    write OP_HALT to REG_OP
+    cpu_exec
