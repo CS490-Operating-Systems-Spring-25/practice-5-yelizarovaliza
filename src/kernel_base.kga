@@ -123,7 +123,6 @@ label kernel_start
     copy var:catStr to REG_B
     write OP_CMP_EQ to REG_OP
     cpu_exec
-    jump_if label:cat_command
 
     copy var:parsedStr to REG_A
     copy var:modifyStr to REG_B
